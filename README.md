@@ -1,9 +1,7 @@
 # GP-LV
-Gaussian process local volatility model
+Gaussian process local volatility model.
 
-By Martin Tegner and Stephen Roberts
-
-Code accompanies this [paper](https://arxiv.org/abs/1901.06021)
+Code accompanies this [paper](https://arxiv.org/abs/1901.06021) by Martin Tegner and Stephen Roberts.
 
 
 ## Install
