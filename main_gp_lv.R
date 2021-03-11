@@ -1,30 +1,48 @@
 #
 # GP local volatility model
 #
-# Martin Tegner 2017-2018
+
 
 
 
 # Libraries and functions -------------------------------------------------
 
-source("functions_gp_lv.R")
 require("limSolve")
 require("mvtnorm")
+source("functions_gp_lv.R")
+
+l.par = list(font.axis=1,font.lab=1,family="serif",cex.lab=1.4,cex.axis=1.4)
+
+plot_LV <- function(f0, f_mu, data){
+  
+  # Plot a local vol surface
+  #
+  # GLOBAL: link, l.par
+  
+  LV = matrix(link(f0 + f_mu), nrow=length(data$T), ncol=length(data$K))
+  
+  par(l.par)
+  zlim = c(0,0.8)
+  persp(x=data$K, y=data$T, z=t(LV), theta=35, phi=25, r=sqrt(81),
+        col=gray(0.7), border=gray(0.6), axes=T,ticktype="detailed",
+        zlim=zlim, zlab='implied volatility', xlab="strike", 
+        ylab="maturity")
+}
 
 
 # Set-up model ------------------------------------------------------------
 
-# Define user-specified variables and functions that
-# are required for the model.
+# Define user-specified variables and functions for the model.
 
 
-# Define link-function (positive transform f -> local-vol)
+# Link-function (positive transform f -> local-vol)
 link <- function(f) log(1 + exp(f))
 linkInv <- function(sig) log(exp(sig) - 1)
 
-# Define log-likelihood function
+# Log-likelihood function
 logL <- function(f0, f_mu, sigma_noise, data){
-  # Log-likelihood of a local vol surface LV = link(f0+f_mu) over 'data$T x data$K'.
+  
+  # Log-likelihood of a local vol surface LV = link(f0 + f_mu) over 'data$T x data$K'.
   # 'f0' is a vector of length = length(data$T)*length(data$K),
   # 'f_mu' and 'sigma_noise' are scalars.
   #
@@ -33,7 +51,7 @@ logL <- function(f0, f_mu, sigma_noise, data){
   #
   # Requires global variables 'Mext' and 'link()'.
   
-  # VECTORISE (if 'data' is list of data-lists for several dates)
+  # VECTORISE (if 'data' is list of data-lists from several dates)
   if(is.list(data[[1]])){
     res = 0
     idx_stop = 0
@@ -45,18 +63,19 @@ logL <- function(f0, f_mu, sigma_noise, data){
     return(res)
   }
   
-  # MAIN 
+  # MAIN FUNCTION
   if(length(f0)!=data$nPoints) stop('length(f0) not matching size TxK of data')
   LV = matrix(link(f0+f_mu),nrow=length(data$T),ncol=length(data$K))
   C_lv = localVolCalls(data$S0,data$rf,data$q,LV,data$K,data$T,KflatExt=data$S0*Mext)
   ll = sum(dnorm(c(data$C),c(C_lv),sigma_noise,log=TRUE),na.rm=TRUE)
+  
   return(ll)
 }
 
 # Flat extension in moneyness for the FD solver of 'localVolCalls' 
-Mext = seq(0.1,4,by=0.2)
+Mext = seq(0.1, 4, by=0.2)
 
-# Define functions for hyper-prior (scaled sigmoid Gaussian)
+# Hyperpriors: scaled sigmoid Gaussian
 ssg_fun <- function(x,y_max,y_min=0) y_min + (y_max-y_min)*1/(1+exp(-x))
 ssg_fun_inv <- function(y,y_max,y_min=0) log(y-y_min) - log(y_max-y)
 rssg <- function(y_max,y_min=0) ssg_fun(rnorm(length(y_max)),y_max,y_min)
@@ -65,11 +84,12 @@ dssg <- function(x,x_max,x_min=0,log=FALSE,z_mu=0,z_sd=1){
   return( log( dnorm(log((x-x_min)/(x_max-x)),mean=z_mu,sd=z_sd)*(x_max-x_min)/((x_max-x)*(x-x_min)) ) )
 }
 
-# Define wrappers for the covariance function
-type = 'SE'    # GLOBAL variable 'Mat12' 'Mat32' 'Mat52'
-K_fun <- function(kappa,data,vsdiag=NULL){
+# GP-prior: covariance funcitons
+type = 'SE'    # a global variable, one of 'SE', 'Mat12', 'Mat32', 'Mat52'
+K_fun <- function(kappa, data, vsdiag=NULL){
+  
   # Makes covariance matrix K. Inputs X from 'data$X_grid_unit', 
-  # a Cartesian grid of [strikes x maturities] normalised to unit
+  # a Cartesian grid of [strikes x maturities] normalised to the unit
   # interval. Optional vector 'vsdiag' scales K vertically. Data
   # can also be list of data-lists, from several dates.
   #
@@ -90,7 +110,8 @@ K_fun <- function(kappa,data,vsdiag=NULL){
     return(covM_SE(X=X_unit,kappa=kappa,type=type))
   }
 }
-L_fun <- function(kappa,data,vsdiag=NULL){
+L_fun <- function(kappa, data, vsdiag=NULL){
+  
   # Same as 'K_fun' but outputs cholesky decomposition.
   
   if(!is.list(data[[1]])){
@@ -108,10 +129,11 @@ L_fun <- function(kappa,data,vsdiag=NULL){
     return(covM_SE(X=X_unit,kappa=kappa,decomp='chol',type=type))
   }
 }
-K_mu_cond <- function(kappa,t,f0_prev,chol=FALSE){
+K_mu_cond <- function(kappa, t, f0_prev, chol=FALSE){
+  
   # Conditional moments for f0(t)|f0(t-1) = f0_prev with
   # inputs X(t) and X(t-1) from DATA[[t]] and DATA[[t-1]]
-  # Given function values: f(t-1) = f0_prev (zer0-mean)
+  # Given function values: f(t-1) = f0_prev (zero-mean)
   #
   # Req. global: 'DATA', 'type'.
   #
@@ -124,16 +146,44 @@ K_mu_cond <- function(kappa,t,f0_prev,chol=FALSE){
 
 
 
-# MCMC algorithm ----------------------------------------------------------
+# Synthetic data ----------------------------------------------------------
 
-# Markov chain Monte Carlo sampling of static local-vol surface and 
-# associated hyper-parameters. 
+# Load a synthetic data-set with call prices from a single date.
 
 
 # Load data-set
 load(file="data_gp_lv.Rdata", verbose=TRUE)
 
-# Define the support of the hyper-prior (kappa,f_mu,sigma), 'kappa = (l_T, l_K, sigma_f)'
+# Plot implied volatility surface
+x = data$K
+y = data$T
+X = t(data$IV)
+zlim = c(0,0.45)
+par(l.par)
+pmat = persp(x=x,y=y,z=X,theta=35,phi=25,border=NA,col="transparent",ticktype="detailed",axes=T,r=sqrt(81),
+             zlab="implied volatility",xlab='strike',ylab="maturity",zlim=zlim)
+pointIdx = is.finite(X)
+a = rep(x, length(y))[pointIdx]
+b = rep(y, each=length(x))[pointIdx]
+X3 = matrix(zlim[1], nrow=nrow(X), ncol=ncol(X))
+xy3 = trans3d(a, b, X3[pointIdx], pmat)
+points(xy3, pch=16, cex=0.5, col=gray(0.5))
+xy4 = trans3d(rep(data$S0, length(y)), y, zlim[1], pmat)
+for(i in 1:ncol(pointIdx)){
+  a = x[pointIdx[,i]]
+  b = rep(y[i], length(a))
+  xy = trans3d(a, b, X[,i][pointIdx[,i]], pmat)
+  points(xy, pch=16, cex=.5, type='o', lwd=1)
+}
+
+
+# MCMC algorithm ----------------------------------------------------------
+
+# Markov chain Monte Carlo sampling of local-vol surface and 
+# hyperparameters. 
+
+
+# Define support of the hyperprior (kappa, f_mu, sigma), with 'kappa = (l_T, l_K, sigma_f)'
 kappaMax = c(1,1,1)
 kappaMin = c(0.1,0.1,0.1)
 lv_mu_max = .5
@@ -141,25 +191,28 @@ sigma_noise_max = .75
 
 # Generate initial (kappa,f_mu,sigma)-state:
 set.seed(1)
-kappa = ssg_fun(rnorm(length(kappaMax)),kappaMax,kappaMin)
+kappa = ssg_fun(rnorm(length(kappaMax)), kappaMax, kappaMin)
 xi = rnorm(2) 
-f_mu = linkInv( ssg_fun(xi[1],lv_mu_max) )
-sigma_noise = ssg_fun(xi[2],sigma_noise_max)
+f_mu = linkInv( ssg_fun(xi[1], lv_mu_max) )
+sigma_noise = ssg_fun(xi[2], sigma_noise_max)
 
 # Generate initial f0-state:
 K = K_fun(kappa,data)
 L = L_fun(kappa,data)
 f0 = L%*%matrix(rnorm(nrow(L)))
 
+# Plot initial LV surface
+plot_LV(f0, f_mu, data)
+
 # Compute log-likelihood of current state
-llcur = logL(f0,f_mu,sigma_noise,data)
+llcur = logL(f0, f_mu, sigma_noise, data)
 
 # Number of iterations/states of the Markov chain 
 nMH = 5000
 
 # Pre-allocate & monitor:
-initial_states = c(f0,kappa,f_mu,sigma_noise,llcur)
-states = matrix(nrow=length(initial_states),ncol = nMH)
+initial_states = c(f0, kappa, f_mu, sigma_noise, llcur)
+states = matrix(nrow=length(initial_states), ncol = nMH)
 nIter_f0 <- nIter_kappa <- nIter_likh <- rep(0,nMH)
 
 R <- LR <- NULL

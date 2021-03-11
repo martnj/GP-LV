@@ -1,7 +1,6 @@
 #
 # Create synthetic data for GP-LV model
 #
-# June 2019
 
 
 

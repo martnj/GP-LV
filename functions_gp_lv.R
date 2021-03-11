@@ -1,6 +1,9 @@
+#
+# Functions for GP local volatility model
+#
+
 
 # Generic
-
 rowSD <- function(x) apply(x,1,sd)
 
 
