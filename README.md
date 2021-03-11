@@ -47,6 +47,6 @@ will produce a 6x7 matrix with implied volatilities (`impVol=FALSE` for prices) 
 
 `main_gp_lv.R` contains a demo:
 
-    * Set-up of model
-    * Hej
+* Set-up of model 
+* Hej
 
