@@ -49,5 +49,5 @@ will produce a 6x7 matrix with implied volatilities (`impVol=FALSE` for prices) 
 
 * **Model setup:** Definitions of link function, likelihood, GP-prior (wrappers for cov. functions) and hyperprior.
 * **Data:** Load synthetic dataset from single date.
-* **MCMC algorithm:** 
+* **MCMC algorithm:** The MCMC scheme for sampling local volatility and hyperparameters based on a call-price surface from a single date.
 
