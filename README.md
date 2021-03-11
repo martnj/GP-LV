@@ -18,7 +18,7 @@ cd GP-LV
 
 ![fig1](fig1.png)
 
-Similarly `data_sequence_gp_lv.Rdata` contains a series of surfaces from ten dates.
+Similarly, `data_sequence_gp_lv.Rdata` contains a series of surfaces from ten dates.
 
 ## Demo
 
