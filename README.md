@@ -17,7 +17,7 @@ cd GP-LV
 
 `data_gp_lv.Rdata` contains a synthetic dataset for experimentation
 
-![Image](fig1.pdf)
+![alt text](fig1.pdf)
 
 ```bash
 PYTHONPATH=. python experiments/sample.py
