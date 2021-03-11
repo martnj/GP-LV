@@ -44,8 +44,6 @@ will produce a 6x7 matrix `IV` with implied volatilities over Tgrid x Kgrid:
 [6,] 0.2474535 0.2480237 0.2462238 0.2476969 0.2465076 0.2463319 0.2461990
 ```
 
-![fig1](fig2.png)
-
 ## Demo
 
 `main_gp_lv.R` 
