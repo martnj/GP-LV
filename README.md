@@ -12,11 +12,13 @@ git clone https://github.com/martnj/GP-LV
 cd GP-LV
 ```
 
-## Dataset
+## Datasets
 
-`data_gp_lv.Rdata` contains a synthetic dataset with prices and implied volatilities. 
+`data_gp_lv.Rdata` contains a synthetic dataset with price and implied volatility surfaces from a single date. 
 
 ![fig1](fig1.png)
+
+Similarly `data_sequence_gp_lv.Rdata` contains a series of surfaces from ten dates.
 
 ## Demo
 
