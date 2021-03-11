@@ -3,29 +3,74 @@
 #
 
 
+
 # Generic
 rowSD <- function(x) apply(x,1,sd)
+
+plot_IV <- function(data, fname=NA){
+  
+  # Plot implied volatility surface
+  
+  x = data$K
+  y = data$T
+  X = t(data$IV)
+  if(!is.na(fname)) png(file=fname)
+    zlim = c(0, 0.45)
+    par(list(font.axis=1,font.lab=1,family="serif",cex.lab=1.4,cex.axis=1.4))
+    pmat = persp(x=x,y=y,z=X,theta=35,phi=25,border=NA,col="transparent",ticktype="detailed",axes=T,r=sqrt(81),
+                 zlab="implied volatility",xlab='strike',ylab="maturity",zlim=zlim)
+    pointIdx = is.finite(X)
+    a = rep(x, length(y))[pointIdx]
+    b = rep(y, each=length(x))[pointIdx]
+    X3 = matrix(zlim[1], nrow=nrow(X), ncol=ncol(X))
+    xy3 = trans3d(a, b, X3[pointIdx], pmat)
+    points(xy3, pch=16, cex=0.5, col=gray(0.5))
+    xy4 = trans3d(rep(data$S0, length(y)), y, zlim[1], pmat)
+    for(i in 1:ncol(pointIdx)){
+      a = x[pointIdx[,i]]
+      b = rep(y[i], length(a))
+      xy = trans3d(a, b, X[,i][pointIdx[,i]], pmat)
+      points(xy, pch=16, cex=.5, type='o', lwd=1)
+    }
+  if(!is.na(fname)) dev.off()
+}
+
+# Scaled sigmoid Gaussian: transform, random and density function
+ssg_fun <- function(x,y_max,y_min=0) y_min + (y_max-y_min)*1/(1+exp(-x))
+ssg_fun_inv <- function(y,y_max,y_min=0) log(y-y_min) - log(y_max-y)
+rssg <- function(y_max,y_min=0) ssg_fun(rnorm(length(y_max)),y_max,y_min)
+dssg <- function(x,x_max,x_min=0,log=FALSE,z_mu=0,z_sd=1){
+  if(!log) return( dnorm(log((x-x_min)/(x_max-x)),mean=z_mu,sd=z_sd)*(x_max-x_min)/((x_max-x)*(x-x_min)) )
+  return( log( dnorm(log((x-x_min)/(x_max-x)),mean=z_mu,sd=z_sd)*(x_max-x_min)/((x_max-x)*(x-x_min)) ) )
+}
 
 
 # MCMC samplers
 ESS_f0 <- function(f0, L, llcur, logL, nESS=1, angleRange=2*pi,...){
+  
   # Eliptical slice sampler for uppdating zero-mean 'f0' 
   # given fixed covariance matrix square-root 'L'.
-  # Log-likelihood: 'logL(f0,...)'
+  #
+  # Log-likelihood: 'logL(f0,...)', 'llcur' is likelihood of
+  # initial 'f0'.
   #
   # OBS! 'f0', is 'f' with zero mean!
   
   nIter = 1
   for(k in 1:nESS){
+    
     # Set ll-threshold & generate ellipse:
     llth <- log(runif(1)) + llcur
     f0nu <- L%*%matrix(rnorm(length(f0)))
+    
     # Initial proposal 'theta' and define bracket:
-    theta <- runif(1,0,angleRange)
-    bracket <- c(theta-angleRange,theta)
+    theta <- runif(1, 0, angleRange)
+    bracket <- c(theta - angleRange, theta)
+    
     while(TRUE){
       f0prop <- f0*cos(theta) + f0nu*sin(theta)
       llprop <- logL(f0prop,...)
+      
       # Accept porposal or shrink backet?
       if(llprop > llth){
         f0 <- f0prop  
@@ -33,15 +78,17 @@ ESS_f0 <- function(f0, L, llcur, logL, nESS=1, angleRange=2*pi,...){
         break
       }else{
         nIter = nIter + 1
-        bracket[(theta>0)+1] = theta
-        theta <- runif(1,bracket[1],bracket[2])
+        bracket[(theta > 0) + 1] = theta
+        theta <- runif(1, bracket[1], bracket[2])
       }
     }
   }
+  
   return(list(f0=f0,llcur=llcur,nIter=nIter,L=L))
 }
 
 SDESS <- function(f0, kappa, kappaMin, kappaMax, logL, llcur, data, s=0.05,K=NULL,R=NULL,LR=NULL, angleRange=2*pi, xi_mu=0, xi_L=1,...){
+  
   # ESS for updating 'kappa' and 'f0' with surrogate data.
   # Log-likelihood: 'logL(f0,data,...)'
   #
@@ -105,12 +152,13 @@ SDESS <- function(f0, kappa, kappaMin, kappaMax, logL, llcur, data, s=0.05,K=NUL
 
 # GP covariance functions
 covM_SE <- function(X,Y=NULL,kappa,structure='none',decomp='none',factors=FALSE,type){
-  #
+  
   # Calculates the covariance matrix 'K = k(X,X)' for
   # squared-exponential kernel with parameters
   # 'kappa = (length_scales,sigma_f)'
   #
   # Allows for X with 'structure' = {'none','duplicated','grid'}
+  #
   # Calculate square-root 'K=LL^T' with 'decomp' = {'none','chol','svd','eigen','inv'}
   # where option 'eigen' gives eigenvalue decomposition {Q,d} for 'K=Q diag(d) Q^T
   # and 'inv' gives inverse of 'K'.
@@ -129,7 +177,6 @@ covM_SE <- function(X,Y=NULL,kappa,structure='none',decomp='none',factors=FALSE,
   # 
   
   
-  #if(!exists('type')) type = 'SE'
   
   # Input control:
   if(!is.matrix(X)) X = as.matrix(X)
@@ -326,7 +373,7 @@ LfromK <- function(K,method="svd",eps=NULL){
 
 # Prediction equations for GP prior
 f_cond_mu_K_Xmat <- function(X_star_unit,X_obs_unit,f_obs,kappa,f_mu=0,L=NULL,v=NULL,vec_output=FALSE,verbose=TRUE,type){
-  #
+  
   # Predictive equations for f* = f(X*) given obs. f = f(X) i.e.
   # mean m* and cov K* based on kernel of 'type'
   # with 'kappa = (length_scales,sigma_f)'. 

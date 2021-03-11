@@ -3,36 +3,16 @@
 #
 
 
-
-
 # Libraries and functions -------------------------------------------------
 
 require("limSolve")
 require("mvtnorm")
 source("functions_gp_lv.R")
 
-l.par = list(font.axis=1,font.lab=1,family="serif",cex.lab=1.4,cex.axis=1.4)
 
-plot_LV <- function(f0, f_mu, data){
-  
-  # Plot a local vol surface
-  #
-  # GLOBAL: link, l.par
-  
-  LV = matrix(link(f0 + f_mu), nrow=length(data$T), ncol=length(data$K))
-  
-  par(l.par)
-  zlim = c(0,0.8)
-  persp(x=data$K, y=data$T, z=t(LV), theta=35, phi=25, r=sqrt(81),
-        col=gray(0.7), border=gray(0.6), axes=T,ticktype="detailed",
-        zlim=zlim, zlab='implied volatility', xlab="strike", 
-        ylab="maturity")
-}
+# Set up model ------------------------------------------------------------
 
-
-# Set-up model ------------------------------------------------------------
-
-# Define user-specified variables and functions for the model.
+# Define user-specified global variables and functions for the model.
 
 
 # Link-function (positive transform f -> local-vol)
@@ -145,36 +125,13 @@ K_mu_cond <- function(kappa, t, f0_prev, chol=FALSE){
 }
 
 
-
 # Synthetic data ----------------------------------------------------------
 
-# Load a synthetic data-set with call prices from a single date.
-
-
-# Load data-set
+# Load a synthetic data-set with option prices from a single date.
 load(file="data_gp_lv.Rdata", verbose=TRUE)
 
 # Plot implied volatility surface
-x = data$K
-y = data$T
-X = t(data$IV)
-zlim = c(0,0.45)
-par(l.par)
-pmat = persp(x=x,y=y,z=X,theta=35,phi=25,border=NA,col="transparent",ticktype="detailed",axes=T,r=sqrt(81),
-             zlab="implied volatility",xlab='strike',ylab="maturity",zlim=zlim)
-pointIdx = is.finite(X)
-a = rep(x, length(y))[pointIdx]
-b = rep(y, each=length(x))[pointIdx]
-X3 = matrix(zlim[1], nrow=nrow(X), ncol=ncol(X))
-xy3 = trans3d(a, b, X3[pointIdx], pmat)
-points(xy3, pch=16, cex=0.5, col=gray(0.5))
-xy4 = trans3d(rep(data$S0, length(y)), y, zlim[1], pmat)
-for(i in 1:ncol(pointIdx)){
-  a = x[pointIdx[,i]]
-  b = rep(y[i], length(a))
-  xy = trans3d(a, b, X[,i][pointIdx[,i]], pmat)
-  points(xy, pch=16, cex=.5, type='o', lwd=1)
-}
+plot_IV(data)
 
 
 # MCMC algorithm ----------------------------------------------------------
@@ -190,7 +147,7 @@ lv_mu_max = .5
 sigma_noise_max = .75
 
 # Generate initial (kappa,f_mu,sigma)-state:
-set.seed(1)
+set.seed(2)
 kappa = ssg_fun(rnorm(length(kappaMax)), kappaMax, kappaMin)
 xi = rnorm(2) 
 f_mu = linkInv( ssg_fun(xi[1], lv_mu_max) )
@@ -267,22 +224,84 @@ for(i in 1:nMH){
   nIter_f0[i] = ess$nIter
   nIter_kappa[i] = sdess$nIter
   nIter_likh[i] = nIter
-  print(i)
+  if(i%%10 == 0) print(i)
 }
 
-#save(states,kappaMin,kappaMax,lv_mu_max,sigma_noise_max,type,Mext,link,linkInv,file='mcmc_states_static.Rdata')
+# save(states, kappaMin, kappaMax, lv_mu_max, sigma_noise_max, type, Mext, link, linkInv,file='mcmc_states_single.Rdata')
 
+
+
+# Look at results ---------------------------------------------------------
+
+# Extract variables
+N = length(f0)
+f0_states = states[1:N, ]
+f_mu_states = states[N+4, ]
+f_states = f0_states + rep(f_mu_states, each=N)
+
+# Plot confidence envelope in 3D
+LV_mean = matrix(rowMeans(link(f_states)), nrow=length(data$T))
+LV_sd = matrix(rowSD(link(f_states)), nrow=length(data$T))
+x = data$K
+y = data$T
+zlim = c(0, 0.8)
+pmat = persp(x=x,y=y,z=t(LV_mean-2*LV_sd),theta=35,phi=25,r=sqrt(81),col=gray(0.5),border=gray(0.7),axes=T,ticktype="detailed",
+             zlim=zlim,zlab='local volatility',xlab="strike",ylab="maturity")
+par(new = TRUE)
+persp(x=x,y=y,z=t(LV_mean),theta=35,phi=25,r=sqrt(81),col=gray(0.7),border=gray(0.6),axes=F,box=F,zlim=zlim)
+par(new = TRUE)
+persp(x=x,y=y,z=t(LV_mean+2*LV_sd),theta=35,phi=25,r=sqrt(81),col=gray(0.9),border=gray(0.7),axes=F,box=F,zlim=zlim)
+lines(trans3d(x=range(x),y=rep(min(y),2),z=rep(zlim[2],2),pmat=pmat),lty=3)
+lines(trans3d(x=rep(max(x),2),y=rep(min(y),2),z=zlim,pmat=pmat),lty=3)
+
+
+# Transform to call prices and implied vols
+C_states <- IV_states <- matrix(nrow=nrow(f_states), ncol=ncol(f_states))
+for(i in 1:ncol(f_states)){
+  LV = matrix(link(f_states[,i]), nrow=length(data$T))
+  C_states[,i] = c( localVolCalls(data$S0,data$rf,data$q,LV,data$K,data$T,KflatExt=data$S0*Mext) )
+  IV_states[,i] = c( localVolCalls(data$S0,data$rf,data$q,LV,data$K,data$T,KflatExt=data$S0*Mext, impVol=TRUE) )
+  if(i%%10 == 0) print(i)
+}
+
+# Plot cross sections of implied vol
+IV_mean = matrix(rowMeans(IV_states), nrow=length(data$T))
+IV_sd = matrix(rowSD(IV_states), nrow=length(data$T))
+
+m_vec = 1:length(y) 
+for(m in m_vec){
+  # pdf(file=paste(figDir,"rapid_2_",m,".pdf",sep=""),height=4,width=6)
+  par(l.par)
+  ylim = c(0.1, 0.55)
+  x = data$K
+  y = data$T
+  plot(x, IV_mean[m,],type="n",ylim=ylim,xlab='strike [USD]',ylab='implied volatility')
+  polygon(c(x, rev(x)),c(IV_mean[m,]+2*IV_sd[m,],rev(IV_mean[m,]-2*IV_sd[m,])),col=grey(0.8),border=NA)
+  lines(x,IV_mean[m,],type="l",lty=1,lwd=2,col=grey(0.5))
+  
+  lines(x,data$IV[m,],col='blue',type='p',pch=16,cex=1)
+  legend('topright',legend=c('±2SD','mean','data'),
+         pch=c(15,NA,16),lty=c(NA,1,NA),lwd=c(NA,2,NA),col=c(gray(0.8),gray(0.5),'blue'),
+         bty='n',cex=l.par$cex.lab,y.intersp=0.75,pt.cex=2)
+  text(x[1],ylim[1],paste('maturity:',signif(y[m],2),'year'), col="black",adj=0,cex=l.par$cex.lab)
+  # dev.off()
+}
 
 
 # Sequential MCMC algorithm -----------------------------------------------
 
 # Load data (10 dates) and MCMC-results for first date
-load(file='mcmc_states_static.Rdata',verbose=TRUE)
+load(file='mcmc_states_single.Rdata',verbose=TRUE)
 load(file="data_sequence_gp_lv.Rdata",verbose=TRUE)
+# save(DATA, file="data_sequence_gp_lv.Rdata")
+# load(file="data_sequence_gp_lv_original.Rdata",verbose=TRUE)
 
-# Extract variables for t=1 from static MCMC sample
-idx = seq(1000, ncol(states), length.out=500)
+for(i in 1:length(DATA)) plot_IV(DATA[[i]])
+
+
+# Extract variables for t=1 from MCMC sample
 N = data$nPoint
+idx = seq(1000, ncol(states), length.out=500)
 f0_states = states[1:N,idx] 
 kappaStates = states[(1:length(kappaMax))+N,idx]
 f_muStates = states[length(kappaMax)+1+N,idx]
@@ -303,7 +322,7 @@ STATES[[1]] <- list(f0_states=f0_states,
                     xi_alpha_K=diag(c(1.5^2,1.5^2)))
 
 
-# Update support of the hyper-prior; 'kappa = (l_T, l_K, l_t, sigma_f)'
+# Update support of the hyperprior; 'kappa = (l_T, l_K, l_t, sigma_f)'
 kappaMax[c(1,2,4)] = kappaMax
 kappaMax[3] = 1
 kappaMin[c(1,2,4)] = kappaMin
@@ -314,13 +333,13 @@ updateAlpha = TRUE
 for(t in 2:length(DATA)){
   
   # Pre-allocate for this t
-  f0_states = matrix(nrow=DATA[[t]]$nPoints,ncol=nMH)
-  kappaStates = matrix(nrow=length(kappaMax),ncol=nMH)
+  f0_states = matrix(nrow=DATA[[t]]$nPoints, ncol=nMH)
+  kappaStates = matrix(nrow=length(kappaMax), ncol=nMH)
   f_muStates <- sigma_noiseStates <- llVec <- numeric(nMH)
   
   # Update kappa & alpha approximative posterior, from (t-1)-sample 
   if(t==2){
-    tmp = ssg_fun_inv(STATES[[t-1]]$kappaStates,kappaMax[-3],kappaMin[-3])
+    tmp = ssg_fun_inv(STATES[[t-1]]$kappaStates, kappaMax[-3], kappaMin[-3])
     xi_kappa_mu = numeric(length(kappaMax))
     xi_kappa_mu[-3] = rowMeans(tmp)
     xi_kappa_K = 1.5^2*diag(length(kappaMax))
@@ -345,7 +364,7 @@ for(t in 2:length(DATA)){
   
   # Based on each posterior state f0(t-1)_i, i=1,...,nMH, update {f0(t), kappa, alpha}
   for(i in 1:nMH){
-    print(i)
+    if(i%%10 == 0) print(i)
     
     f0_prev = STATES[[t-1]]$f0_states[,i]
     
