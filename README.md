@@ -13,7 +13,11 @@ git clone https://github.com/martnj/GP-LV
 cd GP-LV
 ```
 
-## Sample From the Prior
+## Synthetic dataset
+
+`data_gp_lv.Rdata` contains a synthetic dataset for experimentation
+
+![Image](fig1.pdf =100x)
 
 ```bash
 PYTHONPATH=. python experiments/sample.py
