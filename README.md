@@ -49,6 +49,7 @@ will produce a 6x7 matrix with implied volatilities (`impVol=FALSE` for prices) 
 
 * **Model setup:** Definitions of link function, likelihood, GP-prior (wrappers for cov. functions) and hyperprior.
 * **Data:** Load synthetic dataset from single date.
-* **MCMC algorithm:** Posterior sampling of local volatility and hyperparameters based on price surface from a single date.
-* **Results:** Extract variables from MCMC sample; confidence envelope over local vol (in 3D) and implied vol (2D cross-sections). 
+* **MCMC algorithm:** Posterior sampling of local volatility and hyperparameters with price surface from a single date.
+* **Results:** Extract variables from MCMC sample; confidence envelope over local vol (in 3D) and implied vol (2D cross-sections).
+* **Sequential MCMC algorithm:** Sequential sampling of local volatility and hyperparameters with series of price surfaces from ten dates.
 
