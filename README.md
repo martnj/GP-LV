@@ -25,7 +25,7 @@ Similarly, `data_sequence_gp_lv.Rdata` contains a series of surfaces from ten da
 Functions in `functions_gp_lv.R` include MCMC samplers, GP covariance functions and prediction equations, Black-Scholes and local volatility pricing functions.
 
 ```bash
-> Tgrid = c(0.1, 0.25,0.5, 1, 2, 3)
+> Tgrid = c(0.1, 0.25, 0.5, 1, 2, 3)
 > Kgrid = c(90, 95, 100, 105, 110, 115, 120)
 > LV = matrix(0.25, nrow=length(Tgrid), ncol=length(Kgrid))
 > Mext = seq(0.1, 4, by=0.2)
@@ -45,5 +45,8 @@ will produce a 6x7 matrix with implied volatilities (`impVol=FALSE` for prices) 
 
 ## Demo
 
-`main_gp_lv.R` 
+`main_gp_lv.R` contains a demo:
+
+    * Set-up of model
+    * Hej
 
