@@ -51,5 +51,6 @@ will produce a 6x7 matrix with implied volatilities (`impVol=FALSE` for prices) 
 * **Data:** Load synthetic dataset from single date.
 * **MCMC algorithm:** Posterior sampling of local volatility and hyperparameters with price surface from a single date.
 * **Results:** Extract variables from MCMC sample; confidence envelope over local vol (in 3D) and implied vol (2D cross-sections).
-* **Sequential MCMC algorithm:** Sequential sampling of local volatility and hyperparameters with series of price surfaces from ten dates.
+* **Data series:** Load series of synthetic datasets from ten dates.
+* **Sequential MCMC algorithm:** Sequential sampling of local volatility and hyperparameters with series of price-surfaces.
 
