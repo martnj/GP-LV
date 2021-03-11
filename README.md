@@ -20,6 +20,10 @@ cd GP-LV
 
 Similarly, `data_sequence_gp_lv.Rdata` contains a series of surfaces from ten dates.
 
+## Functions
+
+Functions in `functions_gp_lv.R` include MCMC samplers, GP covariance functions and prediction equations, Black-Scholes and local volatility pricing functions.
+
 ## Demo
 
 `main_gp_lv.R` 
