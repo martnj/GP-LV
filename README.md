@@ -25,11 +25,10 @@ Similarly, `data_sequence_gp_lv.Rdata` contains a series of surfaces from ten da
 Functions in `functions_gp_lv.R` include MCMC samplers, GP covariance functions and prediction equations, Black-Scholes and local volatility pricing functions.
 
 ```bash
-> Tgrid = c(0.1, 0.25, 0.5, 1, 2, 3)
-> Kgrid = c(90, 95, 100, 105, 110, 115, 120)
+> Ts = c(0.1, 0.25, 0.5, 1, 2, 3)
+> Ks = c(90, 95, 100, 105, 110, 115, 120)
 > LV = matrix(0.25, nrow=length(Tgrid), ncol=length(Kgrid))
-> Mext = seq(0.1, 4, by=0.2)
-> localVolCalls(S0=100, rf=0.015, q=0.02, LV=LV, Kgrid=Kgrid, Tgrid=Tgrid, KflatExt=100*Mext, impVol=TRUE)
+> localVolCalls(S0=100, rf=0.015, q=0.02, LV=LV, Kgrid=Ks, Tgrid=Ts, KflatExt=100*seq(0.1, 4, by=0.2), impVol=TRUE)
 ```
 will produce a 6x7 matrix with implied volatilities (`impVol=FALSE` for prices) over Tgrid x Kgrid:
 
@@ -49,8 +48,8 @@ will produce a 6x7 matrix with implied volatilities (`impVol=FALSE` for prices) 
 
 * **Model setup:** Definitions of link function, likelihood, GP-prior (wrappers for cov. functions) and hyperprior.
 * **Data:** Load synthetic dataset from single date.
-* **MCMC algorithm:** Posterior sampling of local volatility and hyperparameters with price surface from a single date.
+* **MCMC algorithm:** Posterior sampling of local volatility and hyperparameters from price surface of a single date.
 * **Results:** Extract variables from MCMC sample; confidence envelope over local vol (in 3D) and implied vol (2D cross-sections).
 * **Data series:** Load series of synthetic datasets from ten dates.
-* **Sequential MCMC algorithm:** Sequential sampling of local volatility and hyperparameters with series of price-surfaces.
+* **Sequential MCMC algorithm:** Sequential sampling of local volatility and hyperparameters from series of price-surfaces.
 
