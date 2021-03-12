@@ -55,22 +55,14 @@ logL <- function(f0, f_mu, sigma_noise, data){
 # Flat extension in moneyness for the FD solver of 'localVolCalls' 
 Mext = seq(0.1, 4, by=0.2)
 
-# Hyperpriors: scaled sigmoid Gaussian
-ssg_fun <- function(x,y_max,y_min=0) y_min + (y_max-y_min)*1/(1+exp(-x))
-ssg_fun_inv <- function(y,y_max,y_min=0) log(y-y_min) - log(y_max-y)
-rssg <- function(y_max,y_min=0) ssg_fun(rnorm(length(y_max)),y_max,y_min)
-dssg <- function(x,x_max,x_min=0,log=FALSE,z_mu=0,z_sd=1){
-  if(!log) return( dnorm(log((x-x_min)/(x_max-x)),mean=z_mu,sd=z_sd)*(x_max-x_min)/((x_max-x)*(x-x_min)) )
-  return( log( dnorm(log((x-x_min)/(x_max-x)),mean=z_mu,sd=z_sd)*(x_max-x_min)/((x_max-x)*(x-x_min)) ) )
-}
-
-# GP-prior: covariance funcitons
+# GP-prior: covariance-funciton wrappers
 type = 'SE'    # a global variable, one of 'SE', 'Mat12', 'Mat32', 'Mat52'
 K_fun <- function(kappa, data, vsdiag=NULL){
   
   # Makes covariance matrix K. Inputs X from 'data$X_grid_unit', 
   # a Cartesian grid of [strikes x maturities] normalised to the unit
-  # interval. Optional vector 'vsdiag' scales K vertically. Data
+  # interval. 
+  # Optional vector 'vsdiag' scales K vertically. Data
   # can also be list of data-lists, from several dates.
   #
   # Req. global: 'type' in {'SE', 'Mat12', 'Mat32', 'Mat52'}.
@@ -109,20 +101,34 @@ L_fun <- function(kappa, data, vsdiag=NULL){
     return(covM_SE(X=X_unit,kappa=kappa,decomp='chol',type=type))
   }
 }
-K_mu_cond <- function(kappa, t, f0_prev, chol=FALSE){
+K_mu_cond <- function(kappa, t, f0_prev, DATA, chol=FALSE){
   
   # Conditional moments for f0(t)|f0(t-1) = f0_prev with
   # inputs X(t) and X(t-1) from DATA[[t]] and DATA[[t-1]]
   # Given function values: f(t-1) = f0_prev (zero-mean)
   #
-  # Req. global: 'DATA', 'type'.
+  # Req. global: 'type'.
   #
   # OBS: conditional K not yet implemented with vertical scaling.
   
-  res = f_cond_mu_K_Xmat(X_star_unit=DATA[[t]]$X_grid_unit,X_obs_unit=DATA[[t-1]]$X_grid_unit,f_obs=f0_prev,kappa=kappa,f_mu=0,type=type)
-  if(chol) return( list(K_cond=res$f_star_K,f_mu_cond=res$f_star_mu,L_cond=LfromK(res$f_star_K,method='chol')) )
-  else return( list(K_cond=res$f_star_K,f_mu_cond=res$f_star_mu) )
+  res = f_cond_mu_K_Xmat(X_star_unit=DATA[[t]]$X_grid_unit,
+                         X_obs_unit=DATA[[t-1]]$X_grid_unit,
+                         f_obs=f0_prev,
+                         kappa=kappa,
+                         f_mu=0,
+                         type=type)
+  if(chol) return( list(K_cond=res$f_star_K,
+                        f_mu_cond=res$f_star_mu,
+                        L_cond=LfromK(res$f_star_K,method='chol')))
+  else return( list(K_cond=res$f_star_K,
+                    f_mu_cond=res$f_star_mu) )
 }
+
+# Define support of hyperprior p(kappa, f_mu, sigma), where 'kappa = (l_T, l_K, sigma_f)'
+kappaMax = c(1, 1, 1)
+kappaMin = c(0.1, 0.1, 0.1)
+lv_mu_max = .5
+sigma_noise_max = .75
 
 
 # Synthetic data ----------------------------------------------------------
@@ -139,13 +145,6 @@ plot_IV(data)
 # Markov chain Monte Carlo sampling of local-vol surface and 
 # hyperparameters. 
 
-
-# Define support of the hyperprior (kappa, f_mu, sigma), with 'kappa = (l_T, l_K, sigma_f)'
-kappaMax = c(1,1,1)
-kappaMin = c(0.1,0.1,0.1)
-lv_mu_max = .5
-sigma_noise_max = .75
-
 # Generate initial (kappa,f_mu,sigma)-state:
 set.seed(2)
 kappa = ssg_fun(rnorm(length(kappaMax)), kappaMax, kappaMin)
@@ -154,9 +153,10 @@ f_mu = linkInv( ssg_fun(xi[1], lv_mu_max) )
 sigma_noise = ssg_fun(xi[2], sigma_noise_max)
 
 # Generate initial f0-state:
-K = K_fun(kappa,data)
-L = L_fun(kappa,data)
-f0 = L%*%matrix(rnorm(nrow(L)))
+K = K_fun(kappa, data)
+L = L_fun(kappa, data)
+N = nrow(L)
+f0 = L%*%matrix(rnorm(N))
 
 # Plot initial LV surface
 plot_LV(f0, f_mu, data)
@@ -165,12 +165,13 @@ plot_LV(f0, f_mu, data)
 llcur = logL(f0, f_mu, sigma_noise, data)
 
 # Number of iterations/states of the Markov chain 
-nMH = 5000
+nMH = 25000
 
 # Pre-allocate & monitor:
-initial_states = c(f0, kappa, f_mu, sigma_noise, llcur)
-states = matrix(nrow=length(initial_states), ncol = nMH)
-nIter_f0 <- nIter_kappa <- nIter_likh <- rep(0,nMH)
+f0_states = matrix(nrow=N, ncol=nMH)
+kappa_states = matrix(nrow=length(kappa), ncol=nMH)
+f_mu_states <- sigma_noise_states <- ll_values <- numeric(nMH)
+nIter_f0 <- nIter_kappa <- nIter_likh <- numeric(nMH)
 
 R <- LR <- NULL
 for(i in 1:nMH){
@@ -192,18 +193,22 @@ for(i in 1:nMH){
   
   # Transition 3: sample (f_mu,sigma_noise) given (kappa,f0) with elliptical slice sampling x3.
   for(k in 1:3){
+    
     # Set ll-threshold & generate ellipse
     llth <- log(runif(1)) + llcur
     xi_nu <- rnorm(2)
+    
     # Initial proposal & define bracket
     theta <- runif(1,0,2*pi)
     bracket <- c(theta-2*pi,theta)
+    
     nIter = 1
     while(TRUE){
       xi_prop <- xi[1:2]*cos(theta) + xi_nu*sin(theta)
       f_muProp <- linkInv( ssg_fun(xi_prop[1],lv_mu_max) )
       sigma_noiseProp <- ssg_fun(xi_prop[2],sigma_noise_max)
       llprop <- logL(f0,f_muProp,sigma_noiseProp,data)
+      
       # Accept porposal or shrink backet?
       if(llprop > llth){
         xi[1:2] <- xi_prop
@@ -220,28 +225,33 @@ for(i in 1:nMH){
   }
   
   # Store variables
-  states[,i] = c(f0,kappa,f_mu,sigma_noise,llcur)
+  f0_states[, i] = f0
+  kappa_states[, i] = kappa
+  f_mu_states[i] = f_mu 
+  sigma_noise_states[i] = sigma_noise
+  ll_values[i] = llcur
   nIter_f0[i] = ess$nIter
   nIter_kappa[i] = sdess$nIter
   nIter_likh[i] = nIter
   if(i%%10 == 0) print(i)
 }
 
-# save(states, kappaMin, kappaMax, lv_mu_max, sigma_noise_max, type, Mext, link, linkInv,file='mcmc_states_single.Rdata')
+# save(f0_states, kappa_states, f_mu_states, sigma_noise_states, ll_values,
+#      kappaMin, kappaMax, lv_mu_max, sigma_noise_max, type, Mext, link, linkInv,
+#      file='mcmc_states_single.Rdata')
 
 
 
 # Look at results ---------------------------------------------------------
 
-# Extract variables
-N = length(f0)
-f0_states = states[1:N, ]
-f_mu_states = states[N+4, ]
+# States of f
 f_states = f0_states + rep(f_mu_states, each=N)
 
-# Plot confidence envelope in 3D
+# Sample mean and SD 
 LV_mean = matrix(rowMeans(link(f_states)), nrow=length(data$T))
 LV_sd = matrix(rowSD(link(f_states)), nrow=length(data$T))
+
+# Plot confidence envelope in 3D
 x = data$K
 y = data$T
 zlim = c(0, 0.8)
@@ -255,7 +265,7 @@ lines(trans3d(x=range(x),y=rep(min(y),2),z=rep(zlim[2],2),pmat=pmat),lty=3)
 lines(trans3d(x=rep(max(x),2),y=rep(min(y),2),z=zlim,pmat=pmat),lty=3)
 
 
-# Transform to call prices and implied vols
+# Transform local vol to call price and implied vol
 C_states <- IV_states <- matrix(nrow=nrow(f_states), ncol=ncol(f_states))
 for(i in 1:ncol(f_states)){
   LV = matrix(link(f_states[,i]), nrow=length(data$T))
@@ -288,41 +298,38 @@ for(m in m_vec){
 }
 
 
+# Series of synthetic data ------------------------------------------------
+
+# Load data from 10 dates
+load(file="data_sequence_gp_lv.Rdata",verbose=TRUE)
+
+# Plot
+for(i in 1:length(DATA)) plot_IV(DATA[[i]], main=toString(i))
+
+
 # Sequential MCMC algorithm -----------------------------------------------
 
-# Load data (10 dates) and MCMC-results for first date
+# Load  MCMC-states from first date for initial values
 load(file='mcmc_states_single.Rdata',verbose=TRUE)
-load(file="data_sequence_gp_lv.Rdata",verbose=TRUE)
-# save(DATA, file="data_sequence_gp_lv.Rdata")
-# load(file="data_sequence_gp_lv_original.Rdata",verbose=TRUE)
 
-for(i in 1:length(DATA)) plot_IV(DATA[[i]])
-
-
-# Extract variables for t=1 from MCMC sample
-N = data$nPoint
+# Burn-out and thinning
 idx = seq(1000, ncol(states), length.out=500)
-f0_states = states[1:N,idx] 
-kappaStates = states[(1:length(kappaMax))+N,idx]
-f_muStates = states[length(kappaMax)+1+N,idx]
-sigma_noiseStates = states[length(kappaMax)+2+N,idx]
-llVec = states[nrow(states),idx]
+nMH = length(idx)
 
 # List for states and store the t=1 results
-nMH = length(idx)
 STATES <- list()
-STATES[[1]] <- list(f0_states=f0_states,
-                    kappaStates=kappaStates,
-                    f_muStates=f_muStates,
-                    sigma_noiseStates=sigma_noiseStates,
-                    llVec=llVec,
+STATES[[1]] <- list(f0_states=f0_states[, idx],
+                    kappaStates=kappa_states[, idx],
+                    f_muStates=f_mu_states[idx],
+                    sigma_noiseStates=sigma_noise_states[idx],
+                    llVec=ll_values[idx],
                     xi_kappa_mu=rep(0,4),
                     xi_kappa_K=diag(rep(1.5^2,4)),
                     xi_alpha_mu=c(0,0),
                     xi_alpha_K=diag(c(1.5^2,1.5^2)))
 
 
-# Update support of the hyperprior; 'kappa = (l_T, l_K, l_t, sigma_f)'
+# Update support of the hyperprior for 'l_t': 'kappa = (l_T, l_K, l_t, sigma_f)'
 kappaMax[c(1,2,4)] = kappaMax
 kappaMax[3] = 1
 kappaMin[c(1,2,4)] = kappaMin
@@ -362,14 +369,14 @@ for(t in 2:length(DATA)){
     sigma_noise = alpha[2]
   }
   
-  # Based on each posterior state f0(t-1)_i, i=1,...,nMH, update {f0(t), kappa, alpha}
+  # Based on each posterior state f0(t-1)_i, i=1,...,nMH, update (f0(t), kappa, alpha)
   for(i in 1:nMH){
     if(i%%10 == 0) print(i)
     
     f0_prev = STATES[[t-1]]$f0_states[,i]
     
     #### f0(t) | f0(t-1),kappa,f_mu,sigma_noise ~ ESS ####
-    res = K_mu_cond(kappa,t,f0_prev,chol=TRUE)
+    res = K_mu_cond(kappa,t,f0_prev,DATA, chol=TRUE)
     K = res$K_cond
     L = res$L_cond   
     f0_mu = res$f_mu_cond 
@@ -400,7 +407,7 @@ for(t in 2:length(DATA)){
       while(TRUE){
         xi0_prop <- xi0*cos(theta) + xi0_nu*sin(theta)
         kappaProp <- ssg_fun(xi0_prop + xi_kappa_mu,kappaMax,kappaMin)
-        res <- K_mu_cond(kappaProp,t,f0_prev,chol=TRUE)
+        res <- K_mu_cond(kappaProp,t,f0_prev,DATA,chol=TRUE)
         L_prop <- res$L_cond
         K <- res$K_cond
         f0_mu_prop = res$f_mu_cond
@@ -484,6 +491,10 @@ for(t in 2:length(DATA)){
                       xi_alpha_K=xi_alpha_K)
 }
 
+
+
+# Transform to call prices and implied vols -------------------------------
+
 # Add call prices and implied vols to STATES
 for(t in 1:length(STATES)){
   print(t)
@@ -502,5 +513,50 @@ for(t in 1:length(STATES)){
   STATES[[t]]$IV_states <- IV_states
 }
 
-
 # save(STATES,kappaMax,kappaMin,lv_mu_max,sigma_noise_max,type,file='mcmc_states_sequential.Rdata')
+
+
+
+# Results -----------------------------------------------------------------
+
+
+for(i in 2:length(STATES)){
+
+  # Extract variables
+  N = nrow(STATES[[i]]$f0_states)
+  f_states = STATES[[i]]$f0_states + rep(STATES[[i]]$f_muStates, each=N)
+  data = DATA[[i]]
+  
+  # Plot confidence envelope in 3D
+  # LV_mean = matrix(rowMeans(link(f_states)), nrow=length(data$T))
+  # LV_sd = matrix(rowSD(link(f_states)), nrow=length(data$T))
+  # x = data$K
+  # y = data$T
+  # zlim = c(0, 0.8)
+  # pmat = persp(x=x,y=y,z=t(LV_mean-2*LV_sd),theta=35,phi=25,r=sqrt(81),col=gray(0.5),border=gray(0.7),axes=T,ticktype="detailed",
+  #              zlim=zlim,zlab='local volatility',xlab="strike",ylab="maturity", main=toString(i))
+  # par(new = TRUE)
+  # persp(x=x,y=y,z=t(LV_mean),theta=35,phi=25,r=sqrt(81),col=gray(0.7),border=gray(0.6),axes=F,box=F,zlim=zlim)
+  # par(new = TRUE)
+  # persp(x=x,y=y,z=t(LV_mean+2*LV_sd),theta=35,phi=25,r=sqrt(81),col=gray(0.9),border=gray(0.7),axes=F,box=F,zlim=zlim)
+  # lines(trans3d(x=range(x),y=rep(min(y),2),z=rep(zlim[2],2),pmat=pmat),lty=3)
+  # lines(trans3d(x=rep(max(x),2),y=rep(min(y),2),z=zlim,pmat=pmat),lty=3)
+  
+  # Implied vol
+  
+  IV_mean = matrix(rowMeans(STATES[[i]]$IV_states), nrow=length(data$T))
+  IV_sd = matrix(rowSD(STATES[[i]]$IV_states), nrow=length(data$T))
+  
+  m = 1
+  ylim = c(0.1, 0.55)
+  x = data$K
+  y = data$T
+  plot(x, IV_mean[m,],type="n",ylim=ylim,xlab='strike [USD]',ylab='implied volatility')
+  polygon(c(x, rev(x)),c(IV_mean[m,]+2*IV_sd[m,],rev(IV_mean[m,]-2*IV_sd[m,])),col=grey(0.8),border=NA)
+  lines(x,IV_mean[m,],type="l",lty=1,lwd=2,col=grey(0.5))
+  lines(x,data$IV[m,],col='blue',type='p',pch=16,cex=1)
+  legend('topright',legend=c('±2SD','mean','data'),
+         pch=c(15,NA,16),lty=c(NA,1,NA),lwd=c(NA,2,NA),col=c(gray(0.8),gray(0.5),'blue'),
+         bty='n',cex=l.par$cex.lab,y.intersp=0.75,pt.cex=2)
+  text(x[1],ylim[1],paste('maturity:',signif(y[m],2),'year'), col="black",adj=0,cex=l.par$cex.lab)
+}

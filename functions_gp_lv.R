@@ -7,7 +7,7 @@
 # Generic
 rowSD <- function(x) apply(x,1,sd)
 
-plot_IV <- function(data, fname=NA){
+plot_IV <- function(data, floor=TRUE, fname=NA, main=''){
   
   # Plot implied volatility surface
   
@@ -18,14 +18,16 @@ plot_IV <- function(data, fname=NA){
     zlim = c(0, 0.45)
     par(list(font.axis=1,font.lab=1,family="serif",cex.lab=1.4,cex.axis=1.4))
     pmat = persp(x=x,y=y,z=X,theta=35,phi=25,border=NA,col="transparent",ticktype="detailed",axes=T,r=sqrt(81),
-                 zlab="implied volatility",xlab='strike',ylab="maturity",zlim=zlim)
+                 zlab="implied volatility",xlab='strike',ylab="maturity",main=main, zlim=zlim)
     pointIdx = is.finite(X)
-    a = rep(x, length(y))[pointIdx]
-    b = rep(y, each=length(x))[pointIdx]
-    X3 = matrix(zlim[1], nrow=nrow(X), ncol=ncol(X))
-    xy3 = trans3d(a, b, X3[pointIdx], pmat)
-    points(xy3, pch=16, cex=0.5, col=gray(0.5))
-    xy4 = trans3d(rep(data$S0, length(y)), y, zlim[1], pmat)
+    if(floor){
+      a = rep(x, length(y))[pointIdx]
+      b = rep(y, each=length(x))[pointIdx]
+      X3 = matrix(zlim[1], nrow=nrow(X), ncol=ncol(X))
+      xy3 = trans3d(a, b, X3[pointIdx], pmat)
+      points(xy3, pch=16, cex=0.5, col=gray(0.5))
+      xy4 = trans3d(rep(data$S0, length(y)), y, zlim[1], pmat)
+    }
     for(i in 1:ncol(pointIdx)){
       a = x[pointIdx[,i]]
       b = rep(y[i], length(a))
@@ -33,6 +35,22 @@ plot_IV <- function(data, fname=NA){
       points(xy, pch=16, cex=.5, type='o', lwd=1)
     }
   if(!is.na(fname)) dev.off()
+}
+
+plot_LV <- function(f0, f_mu, data, main=''){
+  
+  # Plot a local vol surface
+  #
+  # GLOBAL: link
+  
+  LV = matrix(link(f0 + f_mu), nrow=length(data$T), ncol=length(data$K))
+  
+  par(list(font.axis=1,font.lab=1,family="serif",cex.lab=1.4,cex.axis=1.4))
+  zlim = c(0,0.8)
+  persp(x=data$K, y=data$T, z=t(LV), theta=35, phi=25, r=sqrt(81),
+        col=gray(0.7), border=gray(0.6), axes=T,ticktype="detailed",
+        zlim=zlim, zlab='implied volatility', xlab="strike", 
+        ylab="maturity", main=main)
 }
 
 # Scaled sigmoid Gaussian: transform, random and density function
