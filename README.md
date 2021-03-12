@@ -56,5 +56,5 @@ will produce a 6x7 matrix with implied volatilities (`impVol=FALSE` for prices) 
 * **Data series:** Load series of synthetic datasets from ten dates.
 * **Sequential MCMC algorithm:** Sequential sampling of local volatility and hyperparameters from series of price-surfaces.
 
-![fig4](fig4_1.png, fig4_2.png)
+![fig4](fig4_1.png) ![fig4](fig4_2.png)
 
