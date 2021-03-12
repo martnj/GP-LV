@@ -168,7 +168,7 @@ SDESS <- function(f0, kappa, kappaMin, kappaMax, logL, llcur, data, s=0.05,K=NUL
 }
 
 
-# GP covariance functions
+# GP covariance function
 covM_SE <- function(X,Y=NULL,kappa,structure='none',decomp='none',factors=FALSE,type){
   
   # Calculates the covariance matrix 'K = k(X,X)' for
@@ -500,7 +500,7 @@ localVolCalls <- function(S0,rf,q,LV,Kgrid,Tgrid,theta=0.5,impVol=FALSE,initialS
   #
   # 'q' and 'rf' can be scalars or vector of same length as 'Tgrid'
   #
-  # Update: 'KflatExp' for flat extrapolation in the wings
+  # 'KflatExp' for flat extrapolation in the wings
   
   
   # Extend grid in K-dimension, only if 'c0' and 'Cinit' = NULL

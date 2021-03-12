@@ -146,7 +146,6 @@ plot_IV(data)
 # hyperparameters. 
 
 # Generate initial (kappa,f_mu,sigma)-state:
-set.seed(2)
 kappa = ssg_fun(rnorm(length(kappaMax)), kappaMax, kappaMin)
 xi = rnorm(2) 
 f_mu = linkInv( ssg_fun(xi[1], lv_mu_max) )
@@ -165,7 +164,7 @@ plot_LV(f0, f_mu, data)
 llcur = logL(f0, f_mu, sigma_noise, data)
 
 # Number of iterations/states of the Markov chain 
-nMH = 25000
+nMH = 15000
 
 # Pre-allocate & monitor:
 f0_states = matrix(nrow=N, ncol=nMH)
@@ -244,8 +243,11 @@ for(i in 1:nMH){
 
 # Look at results ---------------------------------------------------------
 
+
 # States of f
-f_states = f0_states + rep(f_mu_states, each=N)
+idx = seq(5000, 18000, length.out=1500)
+plot(llVec[idx], type='l')
+f_states = (f0_states + rep(f_mu_states, each=nrow(f0_states)))[, idx]
 
 # Sample mean and SD 
 LV_mean = matrix(rowMeans(link(f_states)), nrow=length(data$T))
@@ -255,12 +257,13 @@ LV_sd = matrix(rowSD(link(f_states)), nrow=length(data$T))
 x = data$K
 y = data$T
 zlim = c(0, 0.8)
-pmat = persp(x=x,y=y,z=t(LV_mean-2*LV_sd),theta=35,phi=25,r=sqrt(81),col=gray(0.5),border=gray(0.7),axes=T,ticktype="detailed",
+par(list(font.axis=1,font.lab=1,family="serif",cex.lab=1.4,cex.axis=1.4))
+pmat = persp(x=x,y=y,z=t(LV_mean - 2*LV_sd),theta=35,phi=25,r=sqrt(81),col=gray(0.5),border=gray(0.7),axes=T,ticktype="detailed",
              zlim=zlim,zlab='local volatility',xlab="strike",ylab="maturity")
 par(new = TRUE)
 persp(x=x,y=y,z=t(LV_mean),theta=35,phi=25,r=sqrt(81),col=gray(0.7),border=gray(0.6),axes=F,box=F,zlim=zlim)
 par(new = TRUE)
-persp(x=x,y=y,z=t(LV_mean+2*LV_sd),theta=35,phi=25,r=sqrt(81),col=gray(0.9),border=gray(0.7),axes=F,box=F,zlim=zlim)
+persp(x=x,y=y,z=t(LV_mean + 2*LV_sd),theta=35,phi=25,r=sqrt(81),col=gray(0.9),border=gray(0.7),axes=F,box=F,zlim=zlim)
 lines(trans3d(x=range(x),y=rep(min(y),2),z=rep(zlim[2],2),pmat=pmat),lty=3)
 lines(trans3d(x=rep(max(x),2),y=rep(min(y),2),z=zlim,pmat=pmat),lty=3)
 
@@ -280,8 +283,7 @@ IV_sd = matrix(rowSD(IV_states), nrow=length(data$T))
 
 m_vec = 1:length(y) 
 for(m in m_vec){
-  # pdf(file=paste(figDir,"rapid_2_",m,".pdf",sep=""),height=4,width=6)
-  par(l.par)
+  par(list(font.axis=1,font.lab=1,family="serif",cex.lab=1.4,cex.axis=1.4))
   ylim = c(0.1, 0.55)
   x = data$K
   y = data$T
@@ -294,7 +296,6 @@ for(m in m_vec){
          pch=c(15,NA,16),lty=c(NA,1,NA),lwd=c(NA,2,NA),col=c(gray(0.8),gray(0.5),'blue'),
          bty='n',cex=l.par$cex.lab,y.intersp=0.75,pt.cex=2)
   text(x[1],ylim[1],paste('maturity:',signif(y[m],2),'year'), col="black",adj=0,cex=l.par$cex.lab)
-  # dev.off()
 }
 
 
@@ -520,7 +521,7 @@ for(t in 1:length(STATES)){
 # Results -----------------------------------------------------------------
 
 
-for(i in 2:length(STATES)){
+for(i in 1:length(STATES)){
 
   # Extract variables
   N = nrow(STATES[[i]]$f0_states)
@@ -547,16 +548,19 @@ for(i in 2:length(STATES)){
   IV_mean = matrix(rowMeans(STATES[[i]]$IV_states), nrow=length(data$T))
   IV_sd = matrix(rowSD(STATES[[i]]$IV_states), nrow=length(data$T))
   
-  m = 1
-  ylim = c(0.1, 0.55)
-  x = data$K
-  y = data$T
-  plot(x, IV_mean[m,],type="n",ylim=ylim,xlab='strike [USD]',ylab='implied volatility')
-  polygon(c(x, rev(x)),c(IV_mean[m,]+2*IV_sd[m,],rev(IV_mean[m,]-2*IV_sd[m,])),col=grey(0.8),border=NA)
-  lines(x,IV_mean[m,],type="l",lty=1,lwd=2,col=grey(0.5))
-  lines(x,data$IV[m,],col='blue',type='p',pch=16,cex=1)
-  legend('topright',legend=c('±2SD','mean','data'),
-         pch=c(15,NA,16),lty=c(NA,1,NA),lwd=c(NA,2,NA),col=c(gray(0.8),gray(0.5),'blue'),
-         bty='n',cex=l.par$cex.lab,y.intersp=0.75,pt.cex=2)
-  text(x[1],ylim[1],paste('maturity:',signif(y[m],2),'year'), col="black",adj=0,cex=l.par$cex.lab)
+  png(file=paste("fig4_", i, ".png",sep=""),height=250,width=400)
+    m = 1
+    ylim = c(0.1, 0.55)
+    x = data$K
+    y = data$T
+    par(list(font.axis=1,font.lab=1,family="serif",cex.lab=1,cex.axis=1))
+    plot(x, IV_mean[m,],type="n",ylim=ylim,xlab='strike',ylab='implied volatility', main=paste('Date: ',i,sep=""))
+    polygon(c(x, rev(x)),c(IV_mean[m,]+2*IV_sd[m,],rev(IV_mean[m,]-2*IV_sd[m,])),col=grey(0.8),border=NA)
+    lines(x,IV_mean[m,],type="l",lty=1,lwd=2,col=grey(0.5))
+    lines(x,data$IV[m,],col='blue',type='p',pch=16,cex=1)
+    legend('topright',legend=c('±2SD','mean','data'),
+           pch=c(15,NA,16),lty=c(NA,1,NA),lwd=c(NA,2,NA),col=c(gray(0.8),gray(0.5),'blue'),
+           bty='n',cex=1, y.intersp=0.75,pt.cex=2)
+    text(x[1],ylim[1],paste('maturity:',signif(y[m],2),'year'), col="black",adj=0,cex=1)
+  dev.off()
 }
