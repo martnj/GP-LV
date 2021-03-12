@@ -18,7 +18,7 @@ cd GP-LV
 
 ![fig1](fig1.png)
 
-Similarly, `data_sequence_gp_lv.Rdata` contains a series of surfaces from ten dates.
+Similarly, `data_sequence_gp_lv.Rdata` contains a synthetic series of surfaces from ten dates.
 
 ## Functions
 
@@ -53,7 +53,7 @@ will produce a 6x7 matrix with implied volatilities (`impVol=FALSE` for prices) 
 
 ![fig3](fig3.png)
 
-* **Data series:** Load series of synthetic datasets from ten dates.
+* **Data series:** Load series of synthetic datasets.
 * **Sequential MCMC algorithm:** Sequential sampling of local volatility and hyperparameters from series of price-surfaces.
 * **Results:** Look at posterior over implied volatility at *earliest* maturity of each date.
 
@@ -61,6 +61,5 @@ will produce a 6x7 matrix with implied volatilities (`impVol=FALSE` for prices) 
 ![fig4](fig4_3.png) ![fig4](fig4_4.png)
 ![fig4](fig4_5.png) ![fig4](fig4_6.png)
 ![fig4](fig4_7.png) ![fig4](fig4_8.png)
-
 ![fig4](fig4_9.png) ![fig4](fig4_10.png)
 
