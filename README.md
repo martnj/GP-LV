@@ -14,11 +14,11 @@ cd GP-LV
 
 ## Datasets
 
-`data_gp_lv.Rdata` contains a synthetic dataset with price and implied volatility surfaces from a single date. 
+`data/data_gp_lv.Rdata` contains a synthetic dataset with price and implied volatility surfaces from a single date. 
 
 ![fig1](fig/fig1.png)
 
-Similarly, `data_sequence_gp_lv.Rdata` contains a sequence of synthetic surfaces from ten dates.
+Similarly, `data/data_sequence_gp_lv.Rdata` contains a sequence of synthetic surfaces from ten dates.
 
 ## Functions
 
