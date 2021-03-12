@@ -134,7 +134,7 @@ sigma_noise_max = .75
 # Synthetic data ----------------------------------------------------------
 
 # Load a synthetic data-set with option prices from a single date.
-load(file="data_gp_lv.Rdata", verbose=TRUE)
+load(file="data/data_gp_lv.Rdata", verbose=TRUE)
 
 # Plot implied volatility surface
 plot_IV(data)
@@ -164,7 +164,7 @@ plot_LV(f0, f_mu, data)
 llcur = logL(f0, f_mu, sigma_noise, data)
 
 # Number of iterations/states of the Markov chain 
-nMH = 15000
+nMH = 10000
 
 # Pre-allocate & monitor:
 f0_states = matrix(nrow=N, ncol=nMH)
@@ -176,12 +176,12 @@ R <- LR <- NULL
 for(i in 1:nMH){
   
   # Ttransition 1: sample f0 given (kappa,f_mu,sigma_noise) with elliptical slice sampling x3.
-  L = L_fun(kappa,data)
+  L = L_fun(kappa, data)
   ess = ESS_f0(f0,L=L,llcur=llcur,logL=logL,nESS=3,angleRange=pi/2^3,f_mu=f_mu,sigma_noise=sigma_noise,data=data)
   f0 = ess$f0
   llcur = ess$llcur
   
-  # Transition 2: sample kappa,f0 given (f_mu,sigma_noise) with surrogate data elliptical slice sampling
+  # Transition 2: sample (kappa,f0) given (f_mu,sigma_noise) with surrogate data elliptical slice sampling
   sdess = SDESS(f0=f0,kappa=kappa,kappaMin=kappaMin,kappaMax=kappaMax,logL=logL,llcur=llcur,data=data,K=K,R=R,LR=LR,f_mu=f_mu,sigma_noise=sigma_noise)
   f0 = sdess$f0
   kappa = sdess$kappa
@@ -245,8 +245,7 @@ for(i in 1:nMH){
 
 
 # States of f
-idx = seq(5000, 18000, length.out=1500)
-plot(llVec[idx], type='l')
+idx = seq(2500, nMH, length.out=500)
 f_states = (f0_states + rep(f_mu_states, each=nrow(f0_states)))[, idx]
 
 # Sample mean and SD 
@@ -294,15 +293,15 @@ for(m in m_vec){
   lines(x,data$IV[m,],col='blue',type='p',pch=16,cex=1)
   legend('topright',legend=c('±2SD','mean','data'),
          pch=c(15,NA,16),lty=c(NA,1,NA),lwd=c(NA,2,NA),col=c(gray(0.8),gray(0.5),'blue'),
-         bty='n',cex=l.par$cex.lab,y.intersp=0.75,pt.cex=2)
-  text(x[1],ylim[1],paste('maturity:',signif(y[m],2),'year'), col="black",adj=0,cex=l.par$cex.lab)
+         bty='n',cex=1.4,y.intersp=0.75,pt.cex=2)
+  text(x[1],ylim[1],paste('maturity:',signif(y[m],2),'year'), col="black",adj=0,cex=1.4)
 }
 
 
 # Series of synthetic data ------------------------------------------------
 
 # Load data from 10 dates
-load(file="data_sequence_gp_lv.Rdata",verbose=TRUE)
+load(file="data/data_sequence_gp_lv.Rdata",verbose=TRUE)
 
 # Plot
 for(i in 1:length(DATA)) plot_IV(DATA[[i]], main=toString(i))
@@ -311,10 +310,10 @@ for(i in 1:length(DATA)) plot_IV(DATA[[i]], main=toString(i))
 # Sequential MCMC algorithm -----------------------------------------------
 
 # Load  MCMC-states from first date for initial values
-load(file='mcmc_states_single.Rdata',verbose=TRUE)
+# load(file='mcmc_states_single.Rdata',verbose=TRUE)
 
 # Burn-out and thinning
-idx = seq(1000, ncol(states), length.out=500)
+idx = seq(2500, nMH, length.out=500)
 nMH = length(idx)
 
 # List for states and store the t=1 results
@@ -548,7 +547,7 @@ for(i in 1:length(STATES)){
   IV_mean = matrix(rowMeans(STATES[[i]]$IV_states), nrow=length(data$T))
   IV_sd = matrix(rowSD(STATES[[i]]$IV_states), nrow=length(data$T))
   
-  png(file=paste("fig4_", i, ".png",sep=""),height=250,width=400)
+  # png(file=paste("fig4_", i, ".png",sep=""),height=250,width=400)
     m = 1
     ylim = c(0.1, 0.55)
     x = data$K
@@ -562,5 +561,6 @@ for(i in 1:length(STATES)){
            pch=c(15,NA,16),lty=c(NA,1,NA),lwd=c(NA,2,NA),col=c(gray(0.8),gray(0.5),'blue'),
            bty='n',cex=1, y.intersp=0.75,pt.cex=2)
     text(x[1],ylim[1],paste('maturity:',signif(y[m],2),'year'), col="black",adj=0,cex=1)
-  dev.off()
+  # dev.off()
 }
+
