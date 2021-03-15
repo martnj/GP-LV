@@ -240,12 +240,12 @@ for(i in 1:nMH){
 #      file='mcmc_states_single.Rdata')
 
 
-
 # Look at results ---------------------------------------------------------
 
 
 # States of f
 idx = seq(2500, nMH, length.out=500)
+plot(ll_values[idx])
 f_states = (f0_states + rep(f_mu_states, each=nrow(f0_states)))[, idx]
 
 # Sample mean and SD 
