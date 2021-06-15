@@ -30,7 +30,7 @@ Functions in `functions_gp_lv.R` include MCMC samplers, GP covariance functions 
 > LV = matrix(0.25, nrow=length(Tgrid), ncol=length(Kgrid))
 > localVolCalls(S0=100, rf=0.015, q=0.02, LV=LV, Kgrid=Ks, Tgrid=Ts, KflatExt=100*seq(0.1, 4, by=0.2), impVol=TRUE)
 ```
-will produce a 6x7 matrix with implied volatilities (`impVol=FALSE` for prices) over Tgrid x Kgrid:
+will produce a 6x7 matrix with implied volatilities (`impVol=FALSE` for prices) over `Tgrid` x `Kgrid`:
 
 ```bash
           [,1]      [,2]      [,3]      [,4]      [,5]      [,6]      [,7]
